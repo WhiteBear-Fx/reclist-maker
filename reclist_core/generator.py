@@ -1,5 +1,5 @@
 from typing import Literal
-from views import RLPairView, SyllableView
+from .views import RLPairView, SyllableView
 
 
 class Generator:

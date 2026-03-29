@@ -26,9 +26,11 @@ class CLI:
 
     def _add_args(self) -> None:
         """Add arguments."""
+        # version
         self._parser.add_argument(
             "-v", "--version", action="version", version=self._version)
 
+        # generate
         self._command_generate.add_argument(
             "-i", "--input", required=True, help="Import file path.")
         self._command_generate.add_argument(
@@ -46,11 +48,13 @@ class CLI:
         self._command_generate.add_argument("-r", "--max-redundancy", type=int, help="For the maximum number of extra \
                                             syllables that can be tolerated for fluency, the default is 50.")
 
+        # from presamp
         self._command_from_presamp.add_argument(
             "-i", "--input", required=True, help="Import file path.")
         self._command_from_presamp.add_argument(
             "-o", "--output", help="Output file path.")
 
+        # to presamp
         self._command_to_presamp.add_argument(
             "-i", "--input", required=True, help="Import file path.")
         self._command_to_presamp.add_argument(

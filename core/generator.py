@@ -9,13 +9,19 @@ class Generator:
     """
 
     def __init__(self, syllable_map: dict[str, tuple[str, str]]) -> None:
-        self._syllable_view = SyllableView().from_syllable_phoneme_map(
-            syllable_map)
-        self._pair_view = RLPairView(syllable_map)
+        self.syllable_map = syllable_map
 
-        self._syl_used_as_start: set[str] = set()
-        self._right_used_as_end: set[str] = set()
-        self._syl_used_as_nonstart: set[str] = set()
+    def reset(self) -> None:
+        self._syllable_view = SyllableView().from_syllable_phoneme_map(self.syllable_map)
+        self._pair_view = RLPairView(self.syllable_map)
+
+        self._syl_unused_as_start: set[str] = set(
+            self._syllable_view.get_syllable_map().keys())
+
+        self._right_unused_as_end: set[str] = set(self._pair_view.all_rights())
+
+        self._syl_unused_as_nonstart: set[str] = set(
+            self._syllable_view.get_syllable_map().keys())
 
         self._redu: int = 0
 
@@ -31,7 +37,7 @@ class Generator:
             max_length: int,
             sss_first: bool,
             iter_depth: int,
-            max_redu: int
+            max_redu: int,
     ) -> tuple[list[str], list[str]]:
         """
         Generate a reclist.
@@ -46,26 +52,16 @@ class Generator:
 
         :return: A pair, where the first element is an array of REClist lines, and the second element is an array of oto.ini template lines.
         """
-        self._syl_used_as_start.clear()
-        self._right_used_as_end.clear()
-        self._syl_used_as_nonstart.clear()
 
-        self._perfect_fluent_num = 0
-        self._in_turn_fluent_num = 0
-        self._not_fluent_num = 0
-        self._redu = 0
-
-        self._pair_view = RLPairView(self._syllable_view.get_syllable_map())
-
-        audio_syllable_map = self.create_reclist(
+        audio_phoneme_map = self.create_reclist(
             mode=mode,
             max_length=max_length,
             sss_first=sss_first,
             iter_depth=iter_depth,
             max_redu=max_redu
         )
-        oto = self.create_oto(bmp=bmp, audio_syllable_map=audio_syllable_map)
-        return ([reclist for reclist in audio_syllable_map.keys()], oto)
+        oto = self.create_oto(bmp=bmp, audio_phoneme_map=audio_phoneme_map)
+        return ([reclist for reclist in audio_phoneme_map.keys()], oto)
 
     def create_reclist(
             self,
@@ -75,11 +71,11 @@ class Generator:
             iter_depth: int,
             max_redu: int
     ) -> dict[str, list[str]]:
-        pass
+        self.reset()
 
     def create_oto(
             self,
-            audio_syllable_map: dict[str, list[str]],
+            audio_phoneme_map: dict[str, list[str]],
             bmp: int
     ) -> list[str]:
         pass
@@ -140,9 +136,9 @@ class Generator:
 
                     phoneme_pairs.append((syl, ""))
 
-                self._syl_used_as_start.add(syllable_names[0])
+                self._syl_unused_as_start.remove(syllable_names[0])
                 for syl in syllable_names[1:]:
-                    self._syl_used_as_nonstart.add(syl)
+                    self._syl_unused_as_nonstart.remove(syl)
 
                 if use_right_view:
                     last_right = key
@@ -150,9 +146,8 @@ class Generator:
                     last_right = chunk[-1]
                 phoneme_pairs.append((last_right, "-"))
 
-                self._syl_used_as_start.add(syllable_names[0])
                 last_syl = syllable_names[-1]
-                self._right_used_as_end.add(syl_map[last_syl][1])
+                self._right_unused_as_end.remove(syl_map[last_syl][1])
 
                 key_str = "_".join(syllable_names)
                 result[key_str] = phoneme_pairs
@@ -169,7 +164,7 @@ class Generator:
         :param m: Divisor condition for filtering valid lengths r.
         :return: A list of tuples (sequence, num_labels), where sequence is a list of integers of length r, and num_labels is the number of distinct integers in the sequence (i.e., max_label + 1, at least 2). The list is sorted in ascending order of num_labels.
         """
-        patterns = []
+        patterns: list[tuple[list[int], int]] = []
         for r in range(2, p + 1):
             if m % r != 0:
                 continue
@@ -192,8 +187,37 @@ class Generator:
         patterns.sort(key=lambda x: x[1])
         return patterns
 
-    def _try_build_in_turn(self, pattren, counts, right) -> tuple[dict[str, list[tuple[str, str]]], set[str]]:
-        pass
+    def _try_build_in_turn(self, pattrens: list[tuple[list[int], int]], max_length, use_right_view: bool) -> dict[str, list[tuple[str, str]]]:
+        syl_map = self._syllable_view.get_syllable_map()
+        lr_to_syl = {phonemes: syl for syl, phonemes in syl_map.items()}
+        result: dict[str, list[tuple[str, str]]] = {}
+        line_num = 0
+
+        if use_right_view:
+            get_all_phonemes = self._pair_view.all_rights
+            get_list = self._pair_view.get_lefts_for_right
+        else:
+            get_all_phonemes = self._pair_view.all_lefts
+            get_list = self._pair_view.get_rights_for_left
+
+        for pattren in pattrens:
+            all_phonemes = get_all_phonemes()
+            pattern_len = len(pattren[0])
+
+            for i in range(len(all_phonemes) - pattern_len + 1):
+                phonemes = all_phonemes[i:i + pattern_len]
+
+                if len(phonemes) < pattern_len:
+                    break
+
+                for offset in range(pattern_len):
+                    phonemes_pattren: list[str] = []
+
+                    for label in pattren[0]:
+                        index = (label + offset) % pattern_len
+                        phonemes_pattren.append(phonemes[index])
+
+        # TODO: The generation logic needs to be improved
 
     def _cvvc_in_turn_fluent(self, max_length: int, iter_depth: int, max_redu: int) -> dict[str, list[tuple[str, str]]]:
         pass

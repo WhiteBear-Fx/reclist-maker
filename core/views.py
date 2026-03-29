@@ -201,3 +201,26 @@ class RLPairView:
         if not self._left_to_rights[left]:
             del self._left_to_rights[left]
         return popped
+
+    def remove_pair(self, left: str, right: str) -> bool:
+        """
+        Remove the specific (left, right) pair from the view.
+        Returns True if the pair existed and was removed, False otherwise.
+        """
+        removed = False
+
+        if left in self._left_to_rights:
+            rights = self._left_to_rights[left]
+            if right in rights:
+                rights.remove(right)
+                removed = True
+                if not rights:
+                    del self._left_to_rights[left]
+
+        if right in self._right_to_lefts:
+            lefts = self._right_to_lefts[right]
+            if left in lefts:
+                lefts.remove(left)
+                if not lefts:
+                    del self._right_to_lefts[right]
+        return removed
